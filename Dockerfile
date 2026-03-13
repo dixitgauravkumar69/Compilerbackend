@@ -1,21 +1,34 @@
-# 1. Base image: Isme Java 17 pehle se hai
+# Stage 1: Build Stage (Isme Maven JAR generate karega)
+FROM maven:3.8.4-openjdk-17 AS build
+WORKDIR /app
+
+# 1. pom.xml copy karke dependencies download karein
+COPY pom.xml .
+RUN mvn dependency:go-offline
+
+# 2. Source code copy karke JAR file banayein
+COPY src ./src
+RUN mvn clean package -DskipTests
+
+# Stage 2: Run Stage (Isme final app chalega)
 FROM eclipse-temurin:17-jdk-jammy
 
-# 2. C++ (g++) aur Python install karein
+# 3. C++ aur Python install karein (Aapke compiler ke liye zaroori hai)
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3 \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Work directory set karein
 WORKDIR /app
 
-# 4. Apni JAR file ko container mein copy karein
-# Humne '*' isliye lagaya taaki agar version name ho (like POD-Demo-1.0.jar), toh bhi utha le
-COPY target/POD-Demo.jar app.jar
+# 4. Pichle 'build' stage se JAR file copy karein
+# Dhyan dein: '--from=build' likhna zaroori hai taaki wo Docker ke andar se hi JAR uthaye
+COPY --from=build /app/target/*.jar app.jar
 
-# 5. Ek folder banayein jisme user ka code execute hoga
+# 5. Code execution ke liye folder
 RUN mkdir /app/codes
 
-# 6. Spring Boot app start karne ki command
+# Port expose (Render automatically 8080 detect kar leta hai)
+EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "app.jar"]
